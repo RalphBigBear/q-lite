@@ -7,6 +7,36 @@
 - **HTTP API** - Simple REST interface for LLM inference
 - **Ollama Compatible** - Works with local Ollama server out of the box
 
+## Inspired By
+
+This project stands on the shoulders of giants, drawing inspiration from:
+
+### 🦀 nanochat - Andrej Karpathy
+[github.com/karpathy/nanochat](https://github.com/karpathy/nanochat)
+
+**Single-dial philosophy**: Inspired by nanochat's `--depth` parameter, Q-Lite adopts a simplified `--target` preset system (e.g., `--target esp32`, `--target desktop`). One parameter auto-configures all platform-specific settings.
+
+**End-to-end mindset**: Like nanochat's `speedrun.sh`, Q-Lite provides `quickstart.sh` for instant demos.
+
+**Thank you @karpathy for proving that minimalism and accessibility beat feature bloat.**
+
+### 🦌 llama2.c - Andrej Karpathy
+[github.com/karpathy/llama2.c](https://github.com/karpathy/llama2.c)
+
+**Single-file architecture**: Q-Lite applies the same philosophy to LLM gateways - minimal code, maximum clarity.
+
+### 📡 ESP32-LLM - Davebben
+[github.com/DaveBben/esp32-llm](https://github.com/DaveBben/esp32-llm)
+
+**Edge AI breakthrough**: Proved that LLMs can run on 1MB RAM. Q-Lite builds on this for gateway deployment.
+
+### 🌸 PicoClaw - Sipeed
+[github.com/sipeed/picoclaw](https://github.com/sipeed/picoclaw)
+
+**Lightweight gateway design**: Showed that gateway code can be <1000 lines while remaining functional.
+
+---
+
 ## Features
 
 - ✅ Minimal memory footprint (<1MB RAM)
@@ -183,11 +213,11 @@ Q-Lite combines their philosophies into a single goal: **run LLM gateways anywhe
 ## Platform Support Matrix
 
 | Platform | Status | Flash | RAM | Network | Binary Size |
-|----------|--------|--------|-----|-------------|
-| Linux/x86 | ✅ Full | N/A | Ethernet/WiFi | 53KB |
-| ESP32-S3 | ✅ Port | 100KB | 50KB | WiFi (built-in) | ~100KB |
-| STM32F4/F7 | ✅ Port | 80KB | 40KB | Ethernet | ~80KB |
-| RP2040 | ✅ Port | 60KB | 30KB | WiFi (ESP8266) | ~60KB |
+|----------|--------|-------|-----|----------|-------------|
+| Linux/x86 | ✅ Full | N/A | N/A | Ethernet/WiFi | 69KB |
+| ESP32-S3 | ✅ Port | 4MB | 520KB | WiFi (built-in) | ~100KB |
+| STM32F4/F7 | ✅ Port | 512KB | 128KB | Ethernet | ~80KB |
+| RP2040 | ✅ Port | 2MB | 264KB | WiFi (ESP8266) | ~60KB |
 
 ## Benchmarks
 

@@ -6,13 +6,14 @@
 #include "http.h"
 #include "mem-profile.h"
 #include "backend.h"
+#include "platform.h"
 
 // 全局上下文
 static volatile int running = 1;
 
-// Task 3: Request Queue
+// Task 3: Request Queue (using preset configuration)
 volatile int active_requests = 0;
-#define MAX_CONCURRENT_REQUESTS 10
+static int max_concurrent_requests = 10;  // Will be set by preset
 
 // 信号处理
 void sigint_handler(int sig __attribute__((unused))) {
@@ -22,15 +23,23 @@ void sigint_handler(int sig __attribute__((unused))) {
 
 void print_usage(const char *prog) {
     printf("Q-Lite v%s - Ultra-lightweight LLM gateway\n", Q_LITE_VERSION);
-    printf("Inspired by llama2.c (Karpathy), ESP32-LLM (Davebben), PicoClaw (Sipeed)\n\n");
+    printf("Inspired by nanochat (Karpathy), llama2.c, ESP32-LLM, PicoClaw\n\n");
     printf("Usage: %s [options]\n", prog);
     printf("Options:\n");
+    printf("  --target PRESET     Platform preset: auto, esp32, stm32, pico, desktop\n");
+    printf("                      (default: auto) - Auto-configures all settings\n");
     printf("  --port PORT         HTTP server port (default: %d)\n", DEFAULT_PORT);
     printf("  --backend TYPE      Backend type: ollama, openai, auto (default: auto)\n");
     printf("  --backend-host HOST Backend host (default: localhost)\n");
     printf("  --backend-port PORT Backend port (default: auto-detect)\n");
     printf("  --memory-stats      Enable memory profiling\n");
     printf("  --help              Show this help\n");
+    printf("\nPlatform Presets (inspired by nanochat's --depth):\n");
+    printf("  auto     - Auto-detect platform\n");
+    printf("  esp32    - ESP32-S3 (WiFi, 4MB PSRAM, limited RAM)\n");
+    printf("  stm32    - STM32F4/F7 (Ethernet, very limited RAM)\n");
+    printf("  pico     - Raspberry Pi Pico (WiFi, limited RAM)\n");
+    printf("  desktop  - Desktop/Linux/macOS (plenty RAM, high concurrency)\n");
     printf("\nBackends:\n");
     printf("  ollama   - Ollama API (port 11434)\n");
     printf("  openai   - OpenAI-compatible API (vLLM, LM Studio)\n");
@@ -46,10 +55,28 @@ int main(int argc, char **argv) {
     char backend_type[32] = "auto";
     char backend_host[256] = "localhost";
     int backend_port = 0;
+    PlatformPreset target_preset = TARGET_AUTO;
 
     // 解析参数
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+            char *target_str = argv[++i];
+            if (strcmp(target_str, "esp32") == 0) {
+                target_preset = TARGET_ESP32;
+            } else if (strcmp(target_str, "stm32") == 0) {
+                target_preset = TARGET_STM32;
+            } else if (strcmp(target_str, "pico") == 0) {
+                target_preset = TARGET_PICO;
+            } else if (strcmp(target_str, "desktop") == 0) {
+                target_preset = TARGET_DESKTOP;
+            } else if (strcmp(target_str, "auto") == 0) {
+                target_preset = TARGET_AUTO;
+            } else {
+                fprintf(stderr, "Unknown target preset: %s\n", target_str);
+                print_usage(argv[0]);
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
             config.port = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--backend") == 0 && i + 1 < argc) {
             strncpy(backend_type, argv[++i], sizeof(backend_type) - 1);
@@ -64,6 +91,18 @@ int main(int argc, char **argv) {
             return 0;
         }
     }
+
+    // Apply preset configuration (inspired by nanochat)
+    PlatformConfig preset_config = platform_get_preset(target_preset);
+    max_concurrent_requests = preset_config.queue_depth;  // Use preset queue depth
+
+    printf("[Q-Lite] Target preset: %s\n", target_preset == TARGET_ESP32 ? "ESP32" :
+                                          target_preset == TARGET_STM32 ? "STM32" :
+                                          target_preset == TARGET_PICO ? "Pico" :
+                                          target_preset == TARGET_DESKTOP ? "Desktop" : "Auto");
+    printf("[Q-Lite] Max connections: %d\n", preset_config.max_connections);
+    printf("[Q-Lite] Queue depth: %d\n", preset_config.queue_depth);
+    printf("[Q-Lite] Buffer size: %d bytes\n", preset_config.buffer_size);
 
     // 初始化内存统计
     MemStats mem_stats;

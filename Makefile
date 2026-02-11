@@ -6,7 +6,7 @@ CFLAGS = -Wall -Wextra -O2 -std=c99 -Isrc
 LDFLAGS =
 
 TARGET = q-lite
-SRCS = src/main.c src/http.c src/ollama.c src/mem-profile.c src/backend.c src/platform_init.c
+SRCS = src/main.c src/http.c src/ollama.c src/mem-profile.c src/backend.c src/platform_init.c src/platform_preset.c src/backend_session.c
 OBJS = $(SRCS:.c=.o)
 
 # Platform targets

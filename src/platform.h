@@ -10,6 +10,16 @@
 #define PLATFORM_ESP32 1
 #define PLATFORM_STM32 2
 #define PLATFORM_PICO 3
+#define PLATFORM_DESKTOP 0
+
+// Platform presets (inspired by nanochat's --depth philosophy)
+typedef enum {
+    TARGET_AUTO = 0,    // Auto-detect platform
+    TARGET_ESP32,       // ESP32-S3 (WiFi, 4MB PSRAM)
+    TARGET_STM32,       // STM32F4/F7 (Ethernet)
+    TARGET_PICO,        // Raspberry Pi Pico (WiFi via ESP8266)
+    TARGET_DESKTOP      // Desktop/Linux/macOS/Windows
+} PlatformPreset;
 
 // Platform configuration
 typedef struct {
@@ -17,6 +27,9 @@ typedef struct {
     uint32_t ram_size;
     const char *network_type;
     int max_connections;
+    int buffer_size;         // HTTP buffer size
+    int queue_depth;         // Request queue depth
+    int timeout_ms;         // Request timeout
 } PlatformConfig;
 
 // Platform operations
@@ -60,6 +73,9 @@ extern PlatformOps *platform_ops;
 
 // Platform initialization
 void platform_init(void);
+
+// Get preset configuration (inspired by nanochat's single-dial philosophy)
+PlatformConfig platform_get_preset(PlatformPreset preset);
 
 // Convenience macros
 #define PLATFORM_INIT()          platform_init()
