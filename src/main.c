@@ -10,6 +10,10 @@
 // 全局上下文
 static volatile int running = 1;
 
+// Task 3: Request Queue
+volatile int active_requests = 0;
+#define MAX_CONCURRENT_REQUESTS 10
+
 // 信号处理
 void sigint_handler(int sig __attribute__((unused))) {
     printf("\n[Q-Lite] Shutting down...\n");

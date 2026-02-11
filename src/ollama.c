@@ -189,3 +189,132 @@ int ollama_parse_response(const char *json, OllamaResponse *resp) {
     resp->done = 1;
     return 0;
 }
+
+// 流式生成 - 发送 chunked 响应
+int ollama_generate_stream(const char *model, const char *prompt, int client_fd) {
+    char *json_body = create_generate_json(model, prompt);
+    if (!json_body) return -1;
+
+    // 修改为流式请求
+    char *stream_pos = strstr(json_body, "\"stream\":false");
+    if (stream_pos) {
+        memcpy(stream_pos, "\"stream\":true", 14);
+    }
+
+    char response_buffer[OLLAMA_MAX_RESPONSE * 2];
+    int sock;
+    struct sockaddr_in server;
+
+    // 创建 socket
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        free(json_body);
+        return -1;
+    }
+
+    // 连接服务器
+    server.sin_family = AF_INET;
+    server.sin_port = htons(OLLAMA_DEFAULT_PORT);
+    server.sin_addr.s_addr = inet_addr(OLLAMA_DEFAULT_HOST);
+
+    if (connect(sock, (struct sockaddr*)&server, sizeof(server)) < 0) {
+        close(sock);
+        free(json_body);
+        return -1;
+    }
+
+    // 发送请求
+    char request[OLLAMA_MAX_RESPONSE * 2];
+    char header[512];
+    int header_len = snprintf(header, sizeof(header),
+        "POST %s HTTP/1.1\r\n"
+        "Host: %s\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        OLLAMA_API_GENERATE, OLLAMA_DEFAULT_HOST, strlen(json_body)
+    );
+
+    memcpy(request, header, header_len);
+    memcpy(request + header_len, json_body, strlen(json_body));
+
+    if (send(sock, request, header_len + strlen(json_body), 0) < 0) {
+        close(sock);
+        free(json_body);
+        return -1;
+    }
+
+    free(json_body);
+
+    // 跳过 HTTP header
+    int total_received = 0;
+    int bytes_received;
+    int header_skipped = 0;
+
+    while ((bytes_received = recv(sock, response_buffer + total_received,
+                                   sizeof(response_buffer) - total_received - 1, 0)) > 0) {
+        total_received += bytes_received;
+        response_buffer[total_received] = '\0';
+
+        // 查找 header 结束标记
+        if (!header_skipped) {
+            char *body_start = strstr(response_buffer, "\r\n\r\n");
+            if (body_start != NULL) {
+                body_start += 4;
+                int body_len = total_received - (body_start - response_buffer);
+                memmove(response_buffer, body_start, body_len);
+                total_received = body_len;
+                header_skipped = 1;
+            } else {
+                continue;  // Header 未完整
+            }
+        }
+
+        // 解析多行 JSON 响应
+        char *line_start = response_buffer;
+        char *line_end;
+
+        while ((line_end = strstr(line_start, "}\n")) != NULL) {
+            line_end++;  // 包含 }
+
+            // 提取 response 字段
+            char *resp_start = strstr(line_start, "\"response\":\"");
+            if (resp_start) {
+                resp_start += strlen("\"response\":\"");
+                char *resp_end = strchr(resp_start, '"');
+                if (resp_end) {
+                    *resp_end = '\0';
+
+                    // 发送 chunk
+                    extern int http_send_chunk(int, const char*, size_t);
+                    http_send_chunk(client_fd, resp_start, strlen(resp_start));
+
+                    *resp_end = '"';
+                }
+            }
+
+            // 检查 done
+            if (strstr(line_start, "\"done\":true")) {
+                // 结束
+                close(sock);
+                extern int http_send_chunk_end(int);
+                return http_send_chunk_end(client_fd);
+            }
+
+            line_start = line_end + 1;
+        }
+
+        // 移动剩余数据到开头
+        if (line_start < response_buffer + total_received) {
+            int remaining = total_received - (line_start - response_buffer);
+            memmove(response_buffer, line_start, remaining);
+            total_received = remaining;
+        } else {
+            total_received = 0;
+        }
+    }
+
+    close(sock);
+    return 0;
+}

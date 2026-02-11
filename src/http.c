@@ -7,9 +7,14 @@
 #include <arpa/inet.h>
 #include "ollama.h"
 
+// Task 3: Request Queue (extern from main.c)
+extern volatile int active_requests;
+#define MAX_CONCURRENT_REQUESTS 10
+
 // External Ollama client
 extern char* ollama_generate(const char *model, const char *prompt);
 extern char* ollama_chat(const char *model, const char *message);
+extern int ollama_generate_stream(const char *model, const char *prompt, int client_fd);
 
 // 创建 HTTP 响应
 static void create_response(HttpContext *ctx, int status_code, const char *content_type, const char *body) {
@@ -88,6 +93,16 @@ void http_handle_reading(HttpContext *ctx) {
 
 // FSM: 处理请求
 void http_handle_processing(HttpContext *ctx) {
+    // Task 3: 检查并发队列
+    if (active_requests >= MAX_CONCURRENT_REQUESTS) {
+        http_send_error(ctx->client_fd, 503, "Service Unavailable (too many requests)");
+        ctx->state = HTTP_STATE_CLOSING;
+        return;
+    }
+
+    // 增加请求计数
+    __sync_fetch_and_add(&active_requests, 1);
+
     // 解析 HTTP 方法
     if (strncmp(ctx->request, "GET ", 4) == 0) {
         // 简单的 GET 响应
@@ -134,6 +149,9 @@ void http_handle_processing(HttpContext *ctx) {
         const char *body = "{\"error\":\"Method not allowed\"}";
         create_response(ctx, 405, "application/json", body);
     }
+
+    // 减少请求计数
+    __sync_fetch_and_sub(&active_requests, 1);
 
     ctx->state = HTTP_STATE_RESPONDING;
 }
@@ -225,4 +243,72 @@ int http_server_start(int port) {
 
     printf("[HTTP] Server started on port %d\n", port);
     return server_fd;
+}
+
+// 发送 chunked 响应头
+int http_send_chunked_header(int client_fd, const char *content_type) {
+    char header[256];
+    int len = snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Transfer-Encoding: chunked\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        content_type
+    );
+
+    return send(client_fd, header, len, 0);
+}
+
+// 发送一个数据块
+int http_send_chunk(int client_fd, const char *data, size_t len) {
+    char chunk_header[32];
+
+    // 格式: {size_hex}\r\n
+    snprintf(chunk_header, sizeof(chunk_header), "%zx\r\n", len);
+
+    // 发送 chunk header
+    if (send(client_fd, chunk_header, strlen(chunk_header), 0) < 0) {
+        return -1;
+    }
+
+    // 发送 chunk data
+    if (len > 0 && send(client_fd, data, len, 0) < 0) {
+        return -1;
+    }
+
+    // 发送 \r\n
+    if (send(client_fd, "\r\n", 2, 0) < 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+// 结束 chunked 响应
+int http_send_chunk_end(int client_fd) {
+    // 发送终止 chunk: 0\r\n\r\n
+    return send(client_fd, "0\r\n\r\n", 5, 0);
+}
+
+// 发送错误响应
+int http_send_error(int client_fd, int code, const char *message) {
+    char header[512];
+    char body[256];
+
+    snprintf(body, sizeof(body), "{\"error\":%d,\"message\":\"%s\"}", code, message);
+
+    int header_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        code, (code == 503) ? "Service Unavailable" : "Error", strlen(body)
+    );
+
+    send(client_fd, header, header_len, 0);
+    send(client_fd, body, strlen(body), 0);
+
+    return 0;
 }

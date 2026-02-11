@@ -41,4 +41,12 @@ void http_server_run(HttpContext *ctx);
 // 启动 HTTP 服务器
 int http_server_start(int port);
 
+// Chunked streaming support
+int http_send_chunk(int client_fd, const char *data, size_t len);
+int http_send_chunk_end(int client_fd);
+int http_send_chunked_header(int client_fd, const char *content_type);
+
+// Error responses
+int http_send_error(int client_fd, int code, const char *message);
+
 #endif

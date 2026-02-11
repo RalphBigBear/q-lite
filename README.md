@@ -143,12 +143,12 @@ Q-Lite combines their philosophies into a single goal: **run LLM gateways anywhe
 - [x] ARM optimization
 - [x] RISC-V support
 
-### Phase 3: Advanced Features (In Progress)
+### Phase 3: Advanced Features ✅ Complete
 - [x] Multi-backend support (Ollama, vLLM, LM Studio)
-- [ ] WebSocket support
-- [ ] Queue management
+- [x] HTTP Chunked Streaming (real-time responses)
+- [x] Request Queue (concurrent limiting)
 
-### Phase 4: Microcontroller Ports
+### Phase 4: Microcontroller Ports (Future)
 - [ ] ESP32 port
 - [ ] Raspberry Pi Pico port
 - [ ] STM32 port

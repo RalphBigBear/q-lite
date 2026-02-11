@@ -28,6 +28,9 @@ int http_post(const char *host, int port,
 char* ollama_generate(const char *model, const char *prompt);
 char* ollama_chat(const char *model, const char *message);
 
+// 流式生成 (Task 2: Streaming)
+int ollama_generate_stream(const char *model, const char *prompt, int client_fd);
+
 // 辅助函数
 int ollama_parse_response(const char *json, OllamaResponse *resp);
 
