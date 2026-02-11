@@ -11,7 +11,7 @@ UNAME_S := $(shell uname -s)
 UNAME_M := $(shell uname -m)
 
 # ARM64 optimization (Apple Silicon, modern ARM)
-ifeq ($(UNAME_M),aarch64)
+ifeq ($(UNAME_S),aarch64)
     CFLAGS += -march=armv8-a -mtune=cortex-a72
     $(info ARM64 detected, enabling ARMv8 optimizations)
     TARGET_ARCH = arm64
@@ -31,9 +31,6 @@ ifeq ($(UNAME_M),x86_64)
     TARGET_ARCH = x64
 endif
 
-# Print architecture
-$(info Building for: $(TARGET_ARCH))
-
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
@@ -41,23 +38,29 @@ $(TARGET): $(OBJS)
 	@echo "Build complete: $(TARGET) ($(TARGET_ARCH))"
 	@echo "Binary size:"
 	@ls -lh $(TARGET)
-	@echo "Compiler flags: $(CFLAGS)"
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# ARM optimized build (force -O3)
+# ARM optimized build
 arm-opt: CFLAGS += -O3 -march=native
 arm-opt: clean $(TARGET)
 
-# Profile-guided optimization (experimental)
-pgo: CFLAGS += -fprofile-generate
-pgo: clean $(TARGET)
-	@echo "Running for PGO data collection..."
-	@timeout 3 ./$(TARGET) --port 9999 || true
-	@$(MAKE) clean
-	@$(MAKE) CFLAGS="$(CFLAGS) -fprofile-use" $(TARGET)
-	@echo "PGO build complete"
+# RISC-V 64-bit cross-compilation
+riscv64: CC = riscv64-unknown-elf-gcc
+riscv64: CFLAGS = -Wall -Wextra -O2 -march=rv64imafdc -mabi=lp64d -std=c99
+riscv64: $(TARGET)
+	@echo "Built for RISC-V 64-bit (RV64IMAFDC)"
+
+# RISC-V 32-bit cross-compilation
+riscv32: CC = riscv32-unknown-elf-gcc
+riscv32: CFLAGS = -Wall -Wextra -O2 -march=rv32imac -mabi=ilp32 -std=c99
+riscv32: $(TARGET)
+	@echo "Built for RISC-V 32-bit (RV32IMAC)"
+
+# Test RISC-V binary with QEMU (if installed)
+test-riscv64: qemu-riscv64 $(TARGET) --port 8080 || echo "QEMU not installed"
+test-riscv32: qemu-riscv32 $(TARGET) --port 8080 || echo "QEMU not installed"
 
 clean:
 	rm -f $(OBJS) $(TARGET)
@@ -83,4 +86,4 @@ memory-test: $(TARGET)
 	@sleep 1
 	@pkill -f $(TARGET) || true
 
-.PHONY: all clean run test memory-test arm-opt pgo
+.PHONY: all clean run test memory-test arm-opt riscv64 riscv32 test-riscv64 test-riscv32
