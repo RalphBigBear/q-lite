@@ -128,11 +128,11 @@ Q-Lite combines their philosophies into a single goal: **run LLM gateways anywhe
 
 ## Roadmap
 
-### Phase 1: Core MVP (Current)
+### Phase 1: Core MVP ✅ Complete
 - [x] Project structure
-- [ ] Basic HTTP server
-- [ ] Ollama API integration
-- [ ] Single binary deployment
+- [x] Basic HTTP server
+- [x] Ollama API integration
+- [x] Single binary deployment
 
 ### Phase 2: Edge Optimization
 - [ ] Memory profiling (<1MB target)
