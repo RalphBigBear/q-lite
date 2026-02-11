@@ -17,20 +17,36 @@
 
 ## Quick Start
 
-### Build
+### Option 1: Download Release (Recommended)
+
 ```bash
-make
+# Download latest release from GitHub
+wget https://github.com/RalphBigBear/q-lite/releases/download/v0.1.0-alpha/q-lite
+chmod +x q-lite
+
+# Run
+./q-lite --port 8080
 ```
 
-### Run
+### Option 2: Build from Source
+
 ```bash
+# Clone
+git clone https://github.com/RalphBigBear/q-lite.git
+cd q-lite
+
+# Build
+make
+
+# Run
 ./q-lite --port 8080 --ollama http://localhost:11434
 ```
 
 ### Test
+
 ```bash
-curl http://localhost:8080/v1/chat \
-  -d '{"model": "qwen2.5:7b", "message": "Hello!"}'
+curl http://localhost:8080/
+# Output: {"status":"ok","message":"Q-Lite HTTP Server"}
 ```
 
 ## Architecture
