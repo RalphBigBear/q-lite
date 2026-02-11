@@ -6,16 +6,58 @@ TARGET = q-lite
 SRCS = src/main.c src/http.c src/ollama.c src/mem-profile.c
 OBJS = $(SRCS:.c=.o)
 
+# Detect architecture
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+# ARM64 optimization (Apple Silicon, modern ARM)
+ifeq ($(UNAME_M),aarch64)
+    CFLAGS += -march=armv8-a -mtune=cortex-a72
+    $(info ARM64 detected, enabling ARMv8 optimizations)
+    TARGET_ARCH = arm64
+endif
+
+# ARM32 optimization (Raspberry Pi)
+ifeq ($(UNAME_M),armv7l)
+    CFLAGS += -march=armv7-a -mtune=cortex-a53 -mfpu=neon-vfpv4
+    $(info ARM32 detected, enabling ARMv7 + NEON optimizations)
+    TARGET_ARCH = arm32
+endif
+
+# x86_64 (fallback)
+ifeq ($(UNAME_M),x86_64)
+    CFLAGS += -march=x86-64 -mtune=generic
+    $(info x86_64 detected, using generic optimization)
+    TARGET_ARCH = x64
+endif
+
+# Print architecture
+$(info Building for: $(TARGET_ARCH))
+
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
-	@echo "Build complete: $(TARGET)"
+	@echo "Build complete: $(TARGET) ($(TARGET_ARCH))"
 	@echo "Binary size:"
 	@ls -lh $(TARGET)
+	@echo "Compiler flags: $(CFLAGS)"
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+# ARM optimized build (force -O3)
+arm-opt: CFLAGS += -O3 -march=native
+arm-opt: clean $(TARGET)
+
+# Profile-guided optimization (experimental)
+pgo: CFLAGS += -fprofile-generate
+pgo: clean $(TARGET)
+	@echo "Running for PGO data collection..."
+	@timeout 3 ./$(TARGET) --port 9999 || true
+	@$(MAKE) clean
+	@$(MAKE) CFLAGS="$(CFLAGS) -fprofile-use" $(TARGET)
+	@echo "PGO build complete"
 
 clean:
 	rm -f $(OBJS) $(TARGET)
@@ -41,4 +83,4 @@ memory-test: $(TARGET)
 	@sleep 1
 	@pkill -f $(TARGET) || true
 
-.PHONY: all clean run test memory-test
+.PHONY: all clean run test memory-test arm-opt pgo
