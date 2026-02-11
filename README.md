@@ -134,6 +134,11 @@ Q-Lite combines their philosophies into a single goal: **run LLM gateways anywhe
 - [x] Ollama API integration
 - [x] Single binary deployment
 
+### Phase 2: Edge Optimization ✅ Complete
+- [x] Memory profiling (<1MB target)
+- [x] ARM optimization
+- [x] RISC-V support
+
 ### Phase 2: Edge Optimization
 - [ ] Memory profiling (<1MB target)
 - [ ] ARM optimization
