@@ -1,0 +1,25 @@
+# Compiled binaries
+q-lite
+*.o
+*.exe
+*.out
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.dbg
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test_output/
