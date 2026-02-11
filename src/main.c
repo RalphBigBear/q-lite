@@ -4,6 +4,7 @@
 #include <signal.h>
 #include "config.h"
 #include "http.h"
+#include "mem-profile.h"
 
 // 全局上下文
 static volatile int running = 1;
@@ -21,6 +22,7 @@ void print_usage(const char *prog) {
     printf("Options:\n");
     printf("  --port PORT         HTTP server port (default: %d)\n", DEFAULT_PORT);
     printf("  --ollama URL        Ollama server URL (default: %s)\n", DEFAULT_OLLAMA);
+    printf("  --memory-stats      Enable memory profiling\n");
     printf("  --help              Show this help\n");
 }
 
@@ -30,23 +32,32 @@ int main(int argc, char **argv) {
         .ollama_url = DEFAULT_OLLAMA
     };
 
+    int show_memory_stats = 0;
+
     // 解析参数
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
             config.port = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--ollama") == 0 && i + 1 < argc) {
             strncpy(config.ollama_url, argv[++i], sizeof(config.ollama_url) - 1);
+        } else if (strcmp(argv[i], "--memory-stats") == 0) {
+            show_memory_stats = 1;
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
         }
     }
 
+    // 初始化内存统计
+    MemStats mem_stats;
+    mem_profile_init(&mem_stats);
+
     printf("╔══════════════════════════════════════════╗\n");
     printf("║     Q-Lite v%s - HTTP Gateway          ║\n", Q_LITE_VERSION);
     printf("╠══════════════════════════════════════════╣\n");
     printf("║  Port:    %-4d                         ║\n", config.port);
     printf("║  Ollama:  %-30s ║\n", config.ollama_url);
+    printf("║  Memory:  %-30s ║\n", show_memory_stats ? "Enabled" : "Disabled");
     printf("╚══════════════════════════════════════════╝\n");
 
     // 设置信号处理
@@ -70,13 +81,34 @@ int main(int argc, char **argv) {
     printf("[Q-Lite] Ready to accept connections\n");
     printf("[Q-Lite] Press Ctrl+C to stop\n\n");
 
+    // 显示初始内存状态
+    if (show_memory_stats) {
+        mem_profile_detailed();
+    }
+
     // 主事件循环
     while (running) {
         http_server_run(&ctx);
+
+        // 每隔一段时间显示内存统计（如果启用）
+        if (show_memory_stats) {
+            static int counter = 0;
+            if (++counter % 1000 == 0) {  // 每 1000 次循环
+                mem_profile_detailed();
+            }
+        }
     }
 
     // 清理
     close(server_fd);
+
+    // 显示最终内存统计
+    if (show_memory_stats) {
+        printf("\n");
+        mem_profile_print(&mem_stats);
+        mem_profile_detailed();
+    }
+
     printf("[Q-Lite] Shutdown complete\n");
 
     return 0;
