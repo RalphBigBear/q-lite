@@ -24,7 +24,7 @@
 wget https://github.com/RalphBigBear/q-lite/releases/download/v0.1.0-alpha/q-lite
 chmod +x q-lite
 
-# Run
+# Run with auto-detect backend
 ./q-lite --port 8080
 ```
 
@@ -38,8 +38,12 @@ cd q-lite
 # Build
 make
 
-# Run
-./q-lite --port 8080 --ollama http://localhost:11434
+# Run with auto-detect (detects Ollama, vLLM, LM Studio)
+./q-lite --port 8080
+
+# Or specify backend explicitly
+./q-lite --backend ollama --port 8080
+./q-lite --backend openai --backend-port 8000 --port 8080
 ```
 
 ### Test
@@ -139,13 +143,8 @@ Q-Lite combines their philosophies into a single goal: **run LLM gateways anywhe
 - [x] ARM optimization
 - [x] RISC-V support
 
-### Phase 2: Edge Optimization
-- [ ] Memory profiling (<1MB target)
-- [ ] ARM optimization
-- [ ] RISC-V support
-
-### Phase 3: Advanced Features
-- [ ] Multi-backend support (Ollama, vLLM, LM Studio)
+### Phase 3: Advanced Features (In Progress)
+- [x] Multi-backend support (Ollama, vLLM, LM Studio)
 - [ ] WebSocket support
 - [ ] Queue management
 

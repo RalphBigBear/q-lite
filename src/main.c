@@ -5,6 +5,7 @@
 #include "config.h"
 #include "http.h"
 #include "mem-profile.h"
+#include "backend.h"
 
 // 全局上下文
 static volatile int running = 1;
@@ -21,25 +22,37 @@ void print_usage(const char *prog) {
     printf("Usage: %s [options]\n", prog);
     printf("Options:\n");
     printf("  --port PORT         HTTP server port (default: %d)\n", DEFAULT_PORT);
-    printf("  --ollama URL        Ollama server URL (default: %s)\n", DEFAULT_OLLAMA);
+    printf("  --backend TYPE      Backend type: ollama, openai, auto (default: auto)\n");
+    printf("  --backend-host HOST Backend host (default: localhost)\n");
+    printf("  --backend-port PORT Backend port (default: auto-detect)\n");
     printf("  --memory-stats      Enable memory profiling\n");
     printf("  --help              Show this help\n");
+    printf("\nBackends:\n");
+    printf("  ollama   - Ollama API (port 11434)\n");
+    printf("  openai   - OpenAI-compatible API (vLLM, LM Studio)\n");
+    printf("  auto     - Auto-detect available backend\n");
 }
 
 int main(int argc, char **argv) {
     Config config = {
-        .port = DEFAULT_PORT,
-        .ollama_url = DEFAULT_OLLAMA
+        .port = DEFAULT_PORT
     };
 
     int show_memory_stats = 0;
+    char backend_type[32] = "auto";
+    char backend_host[256] = "localhost";
+    int backend_port = 0;
 
     // 解析参数
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
             config.port = atoi(argv[++i]);
-        } else if (strcmp(argv[i], "--ollama") == 0 && i + 1 < argc) {
-            strncpy(config.ollama_url, argv[++i], sizeof(config.ollama_url) - 1);
+        } else if (strcmp(argv[i], "--backend") == 0 && i + 1 < argc) {
+            strncpy(backend_type, argv[++i], sizeof(backend_type) - 1);
+        } else if (strcmp(argv[i], "--backend-host") == 0 && i + 1 < argc) {
+            strncpy(backend_host, argv[++i], sizeof(backend_host) - 1);
+        } else if (strcmp(argv[i], "--backend-port") == 0 && i + 1 < argc) {
+            backend_port = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--memory-stats") == 0) {
             show_memory_stats = 1;
         } else if (strcmp(argv[i], "--help") == 0) {
@@ -52,11 +65,33 @@ int main(int argc, char **argv) {
     MemStats mem_stats;
     mem_profile_init(&mem_stats);
 
+    // 初始化 backend
+    Backend *backend = NULL;
+    if (strcmp(backend_type, "auto") == 0) {
+        backend = backend_autodetect();
+    } else if (strcmp(backend_type, "ollama") == 0) {
+        int port = (backend_port > 0) ? backend_port : 11434;
+        backend = backend_ollama_create(backend_host, port);
+    } else if (strcmp(backend_type, "openai") == 0) {
+        int port = (backend_port > 0) ? backend_port : 8000;
+        backend = backend_openai_create(backend_host, port);
+    } else {
+        fprintf(stderr, "Unknown backend type: %s\n", backend_type);
+        return 1;
+    }
+
+    if (!backend) {
+        fprintf(stderr, "Failed to initialize backend\n");
+        return 1;
+    }
+
     printf("╔══════════════════════════════════════════╗\n");
     printf("║     Q-Lite v%s - HTTP Gateway          ║\n", Q_LITE_VERSION);
     printf("╠══════════════════════════════════════════╣\n");
     printf("║  Port:    %-4d                         ║\n", config.port);
-    printf("║  Ollama:  %-30s ║\n", config.ollama_url);
+    printf("║  Backend: %-30s ║\n", backend->name);
+    printf("║  Host:    %-30s ║\n", backend->host);
+    printf("║  Port:    %-4d                         ║\n", backend->port);
     printf("║  Memory:  %-30s ║\n", show_memory_stats ? "Enabled" : "Disabled");
     printf("╚══════════════════════════════════════════╝\n");
 
@@ -101,6 +136,7 @@ int main(int argc, char **argv) {
 
     // 清理
     close(server_fd);
+    backend_destroy(backend);
 
     // 显示最终内存统计
     if (show_memory_stats) {
