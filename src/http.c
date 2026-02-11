@@ -1,6 +1,182 @@
-// HTTP server implementation
-// TODO: Implement in Phase 1
+#include "http.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-void http_server_start(int port) {
-    // Placeholder
+// External Ollama client (to be implemented)
+extern char* ollama_generate(const char *model, const char *message);
+
+// 创建 HTTP 响应
+static void create_response(HttpContext *ctx, int status_code, const char *content_type, const char *body) {
+    char header[512];
+    int header_len = snprintf(header, sizeof(header),
+        "HTTP/1.1 %d OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        status_code, content_type, strlen(body)
+    );
+
+    memcpy(ctx->response, header, header_len);
+    memcpy(ctx->response + header_len, body, strlen(body));
+    ctx->response_len = header_len + strlen(body);
+}
+
+// FSM: 等待连接
+void http_handle_idle(HttpContext *ctx) {
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+
+    // 非阻塞 accept
+    ctx->client_fd = accept(ctx->server_fd, (struct sockaddr*)&client_addr, &client_len);
+
+    if (ctx->client_fd >= 0) {
+        // 新连接
+        ctx->state = HTTP_STATE_READING;
+        ctx->request_len = 0;
+        printf("[HTTP] New connection\n");
+    } else {
+        // 无连接，保持 IDLE
+        ctx->state = HTTP_STATE_IDLE;
+    }
+}
+
+// FSM: 读取请求
+void http_handle_reading(HttpContext *ctx) {
+    ssize_t bytes_read = read(ctx->client_fd, ctx->request + ctx->request_len,
+                               HTTP_MAX_REQUEST - ctx->request_len - 1);
+
+    if (bytes_read <= 0) {
+        // 连接关闭或错误
+        ctx->state = HTTP_STATE_CLOSING;
+        return;
+    }
+
+    ctx->request_len += bytes_read;
+    ctx->request[ctx->request_len] = '\0';
+
+    // 检查是否读取完整请求（查找 \r\n\r\n）
+    if (strstr(ctx->request, "\r\n\r\n") != NULL) {
+        ctx->state = HTTP_STATE_PROCESSING;
+    }
+}
+
+// FSM: 处理请求（暂时返回简单响应）
+void http_handle_processing(HttpContext *ctx) {
+    // 解析 HTTP 方法
+    if (strncmp(ctx->request, "GET ", 4) == 0) {
+        // 简单的 GET 响应
+        const char *body = "{\"status\":\"ok\",\"message\":\"Q-Lite HTTP Server\"}";
+        create_response(ctx, 200, "application/json", body);
+    } else if (strncmp(ctx->request, "POST ", 5) == 0) {
+        // 查找 JSON body（在 \r\n\r\n 之后）
+        char *json_start = strstr(ctx->request, "\r\n\r\n");
+        if (json_start != NULL) {
+            json_start += 4;  // 跳过 \r\n\r\n
+
+            // TODO: 解析 JSON 并调用 Ollama
+            const char *body = "{\"status\":\"ok\",\"message\":\"Ollama integration in progress\"}";
+            create_response(ctx, 200, "application/json", body);
+        } else {
+            const char *body = "{\"error\":\"No JSON body\"}";
+            create_response(ctx, 400, "application/json", body);
+        }
+    } else {
+        const char *body = "{\"error\":\"Method not allowed\"}";
+        create_response(ctx, 405, "application/json", body);
+    }
+
+    ctx->state = HTTP_STATE_RESPONDING;
+}
+
+// FSM: 发送响应
+void http_handle_responding(HttpContext *ctx) {
+    ssize_t bytes_sent = write(ctx->client_fd, ctx->response, ctx->response_len);
+
+    if (bytes_sent < 0) {
+        // 发送错误
+        ctx->state = HTTP_STATE_CLOSING;
+    } else if (bytes_sent == ctx->response_len) {
+        // 发送完成
+        ctx->state = HTTP_STATE_CLOSING;
+    } else {
+        // 部分发送，继续
+        // TODO: 处理部分发送
+        ctx->state = HTTP_STATE_CLOSING;
+    }
+}
+
+// FSM: 关闭连接
+void http_handle_closing(HttpContext *ctx) {
+    close(ctx->client_fd);
+    ctx->client_fd = -1;
+    ctx->state = HTTP_STATE_IDLE;
+    printf("[HTTP] Connection closed\n");
+}
+
+// 主事件循环
+void http_server_run(HttpContext *ctx) {
+    while (1) {
+        switch (ctx->state) {
+            case HTTP_STATE_IDLE:
+                http_handle_idle(ctx);
+                break;
+            case HTTP_STATE_READING:
+                http_handle_reading(ctx);
+                break;
+            case HTTP_STATE_PROCESSING:
+                http_handle_processing(ctx);
+                break;
+            case HTTP_STATE_RESPONDING:
+                http_handle_responding(ctx);
+                break;
+            case HTTP_STATE_CLOSING:
+                http_handle_closing(ctx);
+                break;
+        }
+
+        // 避免忙等待
+        usleep(1000);  // 1ms
+    }
+}
+
+// 启动 HTTP 服务器
+int http_server_start(int port) {
+    int server_fd;
+    struct sockaddr_in address;
+
+    // 创建 socket
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+        perror("socket failed");
+        return -1;
+    }
+
+    // 设置 socket 选项
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    // 绑定地址
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
+
+    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+        perror("bind failed");
+        close(server_fd);
+        return -1;
+    }
+
+    // 监听
+    if (listen(server_fd, 3) < 0) {
+        perror("listen failed");
+        close(server_fd);
+        return -1;
+    }
+
+    printf("[HTTP] Server started on port %d\n", port);
+    return server_fd;
 }
