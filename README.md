@@ -168,6 +168,11 @@ Focus areas:
 - Bug fixes
 - Documentation improvements
 
+## Documentation
+
+- **[BUILD.md](docs/BUILD.md)** - Build instructions & troubleshooting
+- **[API.md](docs/API.md)** - REST API documentation & examples
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details.
