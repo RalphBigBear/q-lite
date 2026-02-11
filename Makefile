@@ -3,7 +3,7 @@ CFLAGS = -Wall -Wextra -O2 -std=c99
 LDFLAGS =
 
 TARGET = q-lite
-SRCS = src/main.c src/http.c
+SRCS = src/main.c src/http.c src/ollama.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)
@@ -26,9 +26,10 @@ run: $(TARGET)
 
 test: $(TARGET)
 	@echo "Testing HTTP server..."
-	@timeout 2 ./$(TARGET) --port 8080 &
+	@./$(TARGET) --port 8080 &
 	@sleep 1
-	@curl -s http://localhost:8080/ || echo "Test failed"
+	@curl -s http://localhost:8080/
+	@echo ""
 	@pkill -f $(TARGET) || true
 
 .PHONY: all clean run test

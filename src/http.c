@@ -4,9 +4,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
+#include "ollama.h"
 
-// External Ollama client (to be implemented)
-extern char* ollama_generate(const char *model, const char *message);
+// External Ollama client
+extern char* ollama_generate(const char *model, const char *prompt);
+extern char* ollama_chat(const char *model, const char *message);
 
 // 创建 HTTP 响应
 static void create_response(HttpContext *ctx, int status_code, const char *content_type, const char *body) {
@@ -25,6 +28,25 @@ static void create_response(HttpContext *ctx, int status_code, const char *conte
     ctx->response_len = header_len + strlen(body);
 }
 
+// 简化 JSON 解析（手动提取字段）
+static char* extract_json_field(const char *json, const char *field) {
+    char search[128];
+    snprintf(search, sizeof(search), "\"%s\":\"", field);
+
+    char *start = strstr(json, search);
+    if (!start) return NULL;
+
+    start += strlen(search);
+    char *end = strchr(start, '"');
+    if (!end) return NULL;
+
+    *end = '\0';
+    char *result = strdup(start);
+    *end = '"';
+
+    return result;
+}
+
 // FSM: 等待连接
 void http_handle_idle(HttpContext *ctx) {
     struct sockaddr_in client_addr;
@@ -37,7 +59,7 @@ void http_handle_idle(HttpContext *ctx) {
         // 新连接
         ctx->state = HTTP_STATE_READING;
         ctx->request_len = 0;
-        printf("[HTTP] New connection\n");
+        printf("[HTTP] New connection from %s\n", inet_ntoa(client_addr.sin_addr));
     } else {
         // 无连接，保持 IDLE
         ctx->state = HTTP_STATE_IDLE;
@@ -64,12 +86,12 @@ void http_handle_reading(HttpContext *ctx) {
     }
 }
 
-// FSM: 处理请求（暂时返回简单响应）
+// FSM: 处理请求
 void http_handle_processing(HttpContext *ctx) {
     // 解析 HTTP 方法
     if (strncmp(ctx->request, "GET ", 4) == 0) {
         // 简单的 GET 响应
-        const char *body = "{\"status\":\"ok\",\"message\":\"Q-Lite HTTP Server\"}";
+        const char *body = "{\"status\":\"ok\",\"message\":\"Q-Lite v0.1.0-alpha\",\"endpoints\":{\"GET /\",\"POST /api/generate\",\"POST /api/chat\"}";
         create_response(ctx, 200, "application/json", body);
     } else if (strncmp(ctx->request, "POST ", 5) == 0) {
         // 查找 JSON body（在 \r\n\r\n 之后）
@@ -77,9 +99,33 @@ void http_handle_processing(HttpContext *ctx) {
         if (json_start != NULL) {
             json_start += 4;  // 跳过 \r\n\r\n
 
-            // TODO: 解析 JSON 并调用 Ollama
-            const char *body = "{\"status\":\"ok\",\"message\":\"Ollama integration in progress\"}";
-            create_response(ctx, 200, "application/json", body);
+            // 解析请求: 提取 model 和 prompt/message
+            char *model = extract_json_field(json_start, "model");
+            char *prompt_or_message = extract_json_field(json_start,
+                (strstr(json_start, "\"prompt\":") != NULL) ? "prompt" : "message");
+
+            if (model && prompt_or_message) {
+                // 调用 Ollama
+                char *ollama_response;
+                if (strstr(json_start, "\"prompt\":") != NULL) {
+                    // /api/generate
+                    ollama_response = ollama_generate(model, prompt_or_message);
+                } else {
+                    // /api/chat
+                    ollama_response = ollama_chat(model, prompt_or_message);
+                }
+
+                // 创建 HTTP 响应
+                create_response(ctx, 200, "application/json", ollama_response);
+
+                // 清理
+                free(model);
+                free(prompt_or_message);
+                free(ollama_response);
+            } else {
+                const char *body = "{\"error\":\"Missing model or prompt/message field\"}";
+                create_response(ctx, 400, "application/json", body);
+            }
         } else {
             const char *body = "{\"error\":\"No JSON body\"}";
             create_response(ctx, 400, "application/json", body);
