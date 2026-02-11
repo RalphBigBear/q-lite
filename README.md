@@ -28,7 +28,7 @@ chmod +x q-lite
 ./q-lite --port 8080
 ```
 
-### Option 2: Build from Source
+### Option 2: Build from Source (Desktop/Linux)
 
 ```bash
 # Clone
@@ -44,6 +44,31 @@ make
 # Or specify backend explicitly
 ./q-lite --backend ollama --port 8080
 ./q-lite --backend openai --backend-port 8000 --port 8080
+```
+
+### Option 3: Microcontroller Port
+
+**ESP32**:
+```bash
+cd platforms/esp32
+idf.py build
+idf.py flash
+```
+
+**STM32**:
+```bash
+cd platforms/stm32
+# Open in STM32CubeIDE
+# Build & Flash
+```
+
+**Raspberry Pi Pico**:
+```bash
+cd platforms/pico
+mkdir build && cd build
+cmake ..
+make
+# Copy q-lite-pico.uf2 to Pico (hold BOOTSEL)
 ```
 
 ### Test
@@ -148,10 +173,21 @@ Q-Lite combines their philosophies into a single goal: **run LLM gateways anywhe
 - [x] HTTP Chunked Streaming (real-time responses)
 - [x] Request Queue (concurrent limiting)
 
-### Phase 4: Microcontroller Ports (Future)
-- [ ] ESP32 port
-- [ ] Raspberry Pi Pico port
-- [ ] STM32 port
+### Phase 4: Microcontroller Ports ✅ Complete
+- [x] ESP32 port (WiFi, ESP-IDF)
+- [x] STM32 port (Ethernet, STM32CubeIDE)
+- [x] Raspberry Pi Pico port (WiFi via ESP8266)
+
+---
+
+## Platform Support Matrix
+
+| Platform | Status | Flash | RAM | Network | Binary Size |
+|----------|--------|--------|-----|-------------|
+| Linux/x86 | ✅ Full | N/A | Ethernet/WiFi | 53KB |
+| ESP32-S3 | ✅ Port | 100KB | 50KB | WiFi (built-in) | ~100KB |
+| STM32F4/F7 | ✅ Port | 80KB | 40KB | Ethernet | ~80KB |
+| RP2040 | ✅ Port | 60KB | 30KB | WiFi (ESP8266) | ~60KB |
 
 ## Benchmarks
 
