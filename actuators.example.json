@@ -1,0 +1,32 @@
+{
+  "actuators": [
+    {
+      "id": "led1",
+      "name": "状态LED",
+      "type": "rgb_led",
+      "driver": "ws2812b",
+      "driver_params": "pin=15,num_leds=12"
+    },
+    {
+      "id": "servo1",
+      "name": "舵机1",
+      "type": "servo",
+      "driver": "pwm",
+      "driver_params": "pin=16,min_angle=0,max_angle=180"
+    },
+    {
+      "id": "fan1",
+      "name": "风扇",
+      "type": "relay",
+      "driver": "gpio",
+      "driver_params": "pin=17,active_low=false"
+    },
+    {
+      "id": "buzzer1",
+      "name": "蜂鸣器",
+      "type": "buzzer",
+      "driver": "pwm",
+      "driver_params": "pin=18,frequency=4000"
+    }
+  ]
+}

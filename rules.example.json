@@ -1,0 +1,95 @@
+{
+  "rules": [
+    {
+      "id": "rule-001",
+      "name": "高温风扇控制",
+      "enabled": true,
+      "condition": {
+        "type": "threshold",
+        "sensor": "temp1",
+        "operator": ">",
+        "value": 30.0
+      },
+      "actions": [
+        {
+          "type": "actuator",
+          "target_id": "fan1",
+          "command": "on"
+        },
+        {
+          "type": "actuator",
+          "target_id": "led1",
+          "command": "set",
+          "value": {
+            "r": 255,
+            "g": 0,
+            "b": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule-002",
+      "name": "低温模式",
+      "enabled": true,
+      "condition": {
+        "type": "threshold",
+        "sensor": "temp1",
+        "operator": "<",
+        "value": 20.0
+      },
+      "actions": [
+        {
+          "type": "actuator",
+          "target_id": "fan1",
+          "command": "off"
+        },
+        {
+          "type": "actuator",
+          "target_id": "led1",
+          "command": "set",
+          "value": {
+            "r": 0,
+            "g": 0,
+            "b": 255
+          }
+        }
+      ]
+    },
+    {
+      "id": "rule-003",
+      "name": "智能门禁",
+      "enabled": true,
+      "condition": {
+        "type": "threshold",
+        "sensor": "distance1",
+        "operator": "<",
+        "value": 10.0
+      },
+      "actions": [
+        {
+          "type": "actuator",
+          "target_id": "buzzer1",
+          "command": "beep",
+          "duration_ms": 500
+        },
+        {
+          "type": "actuator",
+          "target_id": "servo1",
+          "command": "angle",
+          "value": 90
+        },
+        {
+          "type": "delay",
+          "duration_ms": 5000
+        },
+        {
+          "type": "actuator",
+          "target_id": "servo1",
+          "command": "angle",
+          "value": 0
+        }
+      ]
+    }
+  ]
+}

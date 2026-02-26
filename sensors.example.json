@@ -1,0 +1,40 @@
+{
+  "sensors": [
+    {
+      "id": "temp1",
+      "name": "室内温度",
+      "type": "temperature",
+      "driver": "dht22",
+      "driver_params": "pin=4",
+      "interval_ms": 1000,
+      "unit": "C"
+    },
+    {
+      "id": "humid1",
+      "name": "室内湿度",
+      "type": "humidity",
+      "driver": "dht22",
+      "driver_params": "pin=4",
+      "interval_ms": 1000,
+      "unit": "%"
+    },
+    {
+      "id": "light1",
+      "name": "光照强度",
+      "type": "light",
+      "driver": "bh1750",
+      "driver_params": "bus=i2c,address=0x23",
+      "interval_ms": 500,
+      "unit": "lux"
+    },
+    {
+      "id": "distance1",
+      "name": "距离传感器",
+      "type": "distance",
+      "driver": "hc-sr04",
+      "driver_params": "trigger_pin=5,echo_pin=18",
+      "interval_ms": 100,
+      "unit": "cm"
+    }
+  ]
+}
