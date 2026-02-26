@@ -1,28 +1,92 @@
 # Q-Lite
 
-**Ultra-lightweight LLM gateway for edge devices.**
+**Semantic Awareness Gateway for Edge Devices** 🌟
 
 - **<1MB RAM** - Can run on ESP32, Raspberry Pi Zero, or any minimal hardware
 - **Pure C** - Zero dependencies, single binary
 - **Multi-Platform** - Linux, macOS, Windows, ESP32, STM32, RP2040
-- **Ollama Compatible** - Works with local Ollama server out of the box
+- **Ollama Compatible** - Works with local Ollama server out of box
+- **✨ Semantic Orchestration** - Natural language to automation rules via LLM
 
 ---
 
 ## 🎯 What is Q-Lite?
 
-Q-Lite is a minimal LLM gateway designed for edge devices with limited resources. It provides HTTP API endpoints for interacting with local LLM servers (Ollama, vLLM, LM Studio) with minimal overhead.
+Q-Lite is a **semantic awareness gateway** designed for edge devices with limited resources. It provides:
 
-### Key Features
+### Core Features (v0.4.0)
 
-- ✅ Ultra-lightweight (<1MB RAM)
-- ✅ Pure C implementation
-- ✅ HTTP server with REST API
-- ✅ Ollama backend integration
-- ✅ Edge device friendly (ARM, RISC-V, x86)
-- ✅ Multi-backend support (Ollama, vLLM, LM Studio)
-- ✅ HTTP Chunked Streaming (real-time responses)
-- ✅ Request Queue (concurrent limiting)
+- ✅ **Cloud API Support** - OpenAI, Anthropic (Claude), OpenAI-compatible APIs
+- ✅ **Sensor API** - Temperature, humidity, light, distance, sound, gas, motion, pressure
+- ✅ **Actuator API** - LED, RGB LED, servo, relay, buzzer, motor control
+- ✅ **Rule Engine** - Semantic orchestration + automatic execution
+- ✅ **Ultra-lightweight** - <1MB RAM, ~100KB binary
+- ✅ **Pure C** - Zero dependencies
+- ✅ **HTTP Server** - REST API endpoints
+- ✅ **Edge Device Friendly** - ARM, RISC-V, x86
+
+### Core Philosophy
+
+> **"Provide low-level capabilities, users orchestrate via semantics"**
+
+Users can describe automation rules in natural language:
+> *"Create a rule: When temperature exceeds 30°C, turn on fan and set LED to red"*
+
+The LLM automatically parses and generates executable rules - **no coding required**.
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────┐
+│ User (Natural Language)                │
+│ "When temperature exceeds 30°C,        │
+│  turn on fan and set LED to red"       │
+└──────────────┬────────────────────────┘
+               ↓ HTTP /chat/completions
+┌─────────────────────────────────────────┐
+│ Q-Lite Gateway (Semantic Awareness)    │
+│                                         │
+│  ┌─────────────────────────────────┐    │
+│  │ LLM Client (Cloud API) ✨    │    │
+│  │  - OpenAI / Anthropic          │    │
+│  │  - Semantic understanding      │    │
+│  │  - Rule generation             │    │
+│  └─────────────────────────────────┘    │
+│                 ↓ POST /rules              │
+│  ┌─────────────────────────────────┐    │
+│  │ Rule Engine ✨                │    │
+│  │  - Load rules                 │    │
+│  │  - Monitor sensors            │    │
+│  │  - Trigger actuators         │    │
+│  └─────────────────────────────────┘    │
+│         ↓              ↓                │
+│  ┌────────────┐  ┌────────────┐  │
+│  │ Sensor API │  │Actuator API│  │
+│  └────────────┘  └────────────┘  │
+└──────────────┬────────────────────────┘
+               ↓
+        ┌──────┴──────┐
+        ↓             ↓
+┌───────────┐  ┌──────────┐
+│ Sensors   │  │Actuators│
+│ Temp/Humid│  │ LED/     │
+│ Light/    │  │ Servo/   │
+│ Distance/  │  │ Relay/   │
+│ Sound/     │  │ Buzzer/  │
+│ Gas/Motion │  │ Motor    │
+└───────────┘  └──────────┘
+```
+
+### Components
+
+- **LLM Client** - Cloud API integration (OpenAI, Anthropic)
+- **Rule Engine** - Semantic rule orchestration + automatic execution
+- **Sensor API** - Unified sensor interface (8+ sensor types)
+- **Actuator API** - Unified actuator interface (6+ actuator types)
+- **HTTP Server** - REST API endpoints
+- **Request Queue** - Concurrent limiting (max 10 requests)
 
 ---
 
@@ -47,145 +111,381 @@ Q-Lite is a minimal LLM gateway designed for edge devices with limited resources
 
 ---
 
+## 🎮 Usage Examples
+
+### Example 1: Smart Temperature Control System
+
+**User Input (Natural Language)**:
+```
+"Create a smart temperature control system:
+When temperature exceeds 30°C, turn on fan and set LED to red
+When temperature drops below 20°C, turn off fan and set LED to blue"
+```
+
+**LLM Generates Rules (JSON)**:
+```json
+{
+  "rules": [
+    {
+      "id": "rule-001",
+      "name": "High Temperature Alert",
+      "condition": {
+        "type": "threshold",
+        "sensor": "temp1",
+        "operator": ">",
+        "value": 30.0
+      },
+      "actions": [
+        {
+          "type": "actuator",
+          "target_id": "fan1",
+          "command": "on"
+        },
+        {
+          "type": "actuator",
+          "target_id": "led1",
+          "command": "set",
+          "value": {"r": 255, "g": 0, "b": 0}
+        }
+      ]
+    },
+    {
+      "id": "rule-002",
+      "name": "Low Temperature Mode",
+      "condition": {
+        "type": "threshold",
+        "sensor": "temp1",
+        "operator": "<",
+        "value": 20.0
+      },
+      "actions": [
+        {
+          "type": "actuator",
+          "target_id": "fan1",
+          "command": "off"
+        },
+        {
+          "type": "actuator",
+          "target_id": "led1",
+          "command": "set",
+          "value": {"r": 0, "g": 0, "b": 255}
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Automatic Execution**:
+1. Sensor reads temperature data every 1000ms
+2. Rule engine evaluates all rules every 1000ms
+3. When `temp1 > 30.0`: Turn on fan + LED red
+4. When `temp1 < 20.0`: Turn off fan + LED blue
+
+---
+
+### Example 2: Smart Door Access System
+
+**User Input (Natural Language)**:
+```
+"Create a smart door access system:
+When distance sensor detects someone approaching (< 10cm),
+beep buzzer, open servo door, wait 5 seconds, then close"
+```
+
+**Automatic Execution**:
+1. Distance sensor reads every 100ms
+2. When someone approaches (`distance1 < 10.0`):
+   - Buzzer beeps (500ms)
+   - Servo opens door (90°)
+   - Wait 5 seconds
+   - Servo closes door (0°)
+
+---
+
 ## 🚀 Quick Start
 
-### Option 1: Download Release (Recommended)
+### Step 1: Download Release
 
 ```bash
 # Download latest release from GitHub
-wget https://github.com/RalphBigBear/q-lite/releases/download/v0.3.0/q-lite
+wget https://github.com/RalphBigBear/q-lite/releases/download/v0.4.0/q-lite
 chmod +x q-lite
 
-# Run with auto-detect backend
-./q-lite --port 8080
-```
-
-### Option 2: Build from Source (Linux/macOS)
-
-```bash
-# Clone
+# Or build from source
 git clone https://github.com/RalphBigBear/q-lite.git
 cd q-lite
-
-# Build
 make
-
-# Run with auto-detect (detects Ollama, vLLM, LM Studio)
-./q-lite --port 8080
-
-# Or specify backend explicitly
-./q-lite --backend ollama --port 8080
-./q-lite --backend openai --backend-port 8000 --port 8080
 ```
 
-### Option 3: ESP32 Microcontroller
+### Step 2: Configure Cloud API (Optional)
 
-```bash
-cd platforms/esp32
-idf.py set-target esp32s3
-idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
+Edit `config.json`:
+
+**OpenAI**:
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "base_url": "https://api.openai.com/v1",
+  "api_key": "sk-...",
+  "timeout": 30000
+}
 ```
 
-**See [platforms/esp32/README.md](platforms/esp32/README.md) for detailed ESP32 instructions.**
-
-### Option 4: STM32 Microcontroller
-
-```bash
-cd platforms/stm32
-# Open in STM32CubeIDE
-# Build & Flash
+**Anthropic**:
+```json
+{
+  "provider": "anthropic",
+  "model": "claude-3-5-sonnet-20241022",
+  "base_url": "https://api.anthropic.com/v1",
+  "api_key": "sk-ant-...",
+  "timeout": 30000
+}
 ```
 
-**See [platforms/stm32/README.md](platforms/stm32/README.md) for detailed STM32 instructions.**
+### Step 3: Configure Sensors (Optional)
 
-### Option 5: Raspberry Pi Pico
+Edit `sensors.json`:
 
-```bash
-cd platforms/pico
-mkdir build && cd build
-cmake ..
-make
-# Copy q-lite-pico.uf2 to Pico (hold BOOTSEL)
+```json
+{
+  "sensors": [
+    {
+      "id": "temp1",
+      "name": "Indoor Temperature",
+      "type": "temperature",
+      "driver": "dht22",
+      "driver_params": "pin=4",
+      "interval_ms": 1000,
+      "unit": "C"
+    },
+    {
+      "id": "distance1",
+      "name": "Distance Sensor",
+      "type": "distance",
+      "driver": "hc-sr04",
+      "driver_params": "trigger_pin=5,echo_pin=18",
+      "interval_ms": 100,
+      "unit": "cm"
+    }
+  ]
+}
 ```
 
-**See [platforms/pico/README.md](platforms/pico/README.md) for detailed Pico instructions.**
+### Step 4: Configure Actuators (Optional)
 
----
+Edit `actuators.json`:
 
-## 📖 Usage
+```json
+{
+  "actuators": [
+    {
+      "id": "fan1",
+      "name": "Fan",
+      "type": "relay",
+      "driver": "gpio",
+      "driver_params": "pin=17,active_low=false"
+    },
+    {
+      "id": "led1",
+      "name": "Status LED",
+      "type": "rgb_led",
+      "driver": "ws2812b",
+      "driver_params": "pin=15,num_leds=12"
+    }
+  ]
+}
+```
 
-### Start Server
+### Step 5: Start Q-Lite
 
 ```bash
-# Auto-detect backend (recommended)
+# Auto-detect backend (Ollama, vLLM, LM Studio)
 ./q-lite --port 8080
 
 # Specify backend
-./q-lite --backend ollama --port 8080
+./q-lite --backend openai --port 8080
 
-# Specify host and port
-./q-lite --backend openai --backend-host 192.168.1.100 --backend-port 8000 --port 8080
-```
-
-### Test Endpoints
-
-```bash
-# Health check
-curl http://localhost:8080/
-# {"status":"ok","message":"Q-Lite HTTP Server"}
-
-# List models
-curl http://localhost:8080/models
-# {"models":["llama2-7b","mistral-7b","gemma-7b"]}
-
-# Generate text (streaming)
-curl -X POST http://localhost:8080/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"model":"llama2-7b","prompt":"Hello, world!","max_tokens":50,"stream":true}'
-
-# Generate text (non-streaming)
-curl -X POST http://localhost:8080/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"model":"llama2-7b","prompt":"Hello, world!","max_tokens":50}'
+# With sensors and actuators
+./q-lite \
+  --config config.json \
+  --sensors sensors.json \
+  --actuators actuators.json \
+  --rules rules.json \
+  --port 8080
 ```
 
 ---
 
-## 🏗️ Architecture
+## 📚 API Documentation
 
+### Sensor API
+
+```bash
+# List all sensors
+GET /sensors
+
+# Read specific sensor
+GET /sensors/temp1
+
+# Batch read
+POST /sensors/read
+{"ids": ["temp1", "humid1", "light1"]}
+
+# Real-time data stream
+WS /sensors/stream
 ```
-┌─────────────────────────────────────────┐
-│ Edge Device (Q-Lite, <1MB RAM)          │
-│                                         │
-│  HTTP Server (REST API)                 │
-│  ↓                                      │
-│  Backend Client (Ollama, vLLM, LM Studio)│
-│  ↓                                      │
-│  Local LLM Server (Ollama, 128GB RAM)   │
-│                                         │
-└─────────────────────────────────────────┘
+
+**Response Example**:
+```json
+{
+  "sensors": [
+    {
+      "id": "temp1",
+      "name": "Indoor Temperature",
+      "type": 1,
+      "driver": 0,
+      "unit": "C",
+      "value": 25.5,
+      "last_update": 1708900000
+    }
+  ]
+}
 ```
 
-### Components
+### Actuator API
 
-- **HTTP Server** - Lightweight HTTP server with REST API
-- **Backend Client** - Multi-backend support (Ollama, vLLM, LM Studio, OpenAI-compatible)
-- **Request Queue** - Concurrent limiting (max 10 requests)
-- **Platform Abstraction** - Unified interface for different platforms
+```bash
+# List all actuators
+GET /actuators
+
+# Turn on actuator
+POST /actuators/fan1/on
+
+# Turn off actuator
+POST /actuators/fan1/off
+
+# Set value (PWM, angle, etc.)
+POST /actuators/led1/set
+{"r": 255, "g": 0, "b": 0}
+
+# Set servo angle
+POST /actuators/servo1/angle
+{"angle": 90}
+
+# Beep buzzer
+POST /actuators/buzzer1/beep
+{"duration_ms": 1000}
+```
+
+### Rule API
+
+```bash
+# List all rules
+GET /rules
+
+# Add rule (from LLM or manual)
+POST /rules
+{
+  "name": "High Temperature Alert",
+  "condition": {
+    "type": "threshold",
+    "sensor": "temp1",
+    "operator": ">",
+    "value": 30.0
+  },
+  "actions": [
+    {
+      "type": "actuator",
+      "target_id": "fan1",
+      "command": "on"
+    }
+  ]
+}
+
+# Delete rule
+DELETE /rules/rule-001
+
+# Enable/disable rule
+PUT /rules/rule-001
+{"enabled": true}
+```
+
+### LLM Rule Generation
+
+```bash
+# Generate rule from natural language
+POST /chat/completions
+{
+  "mode": "rule_generation",
+  "prompt": "Create a rule: When temperature exceeds 30°C, turn on fan",
+  "context": {
+    "sensors": ["temp1", "humid1"],
+    "actuators": ["fan1", "led1"]
+  }
+}
+
+# LLM generates executable rule JSON
+{
+  "rule": {
+    "id": "rule-001",
+    "name": "High Temperature Alert",
+    "condition": {
+      "type": "threshold",
+      "sensor": "temp1",
+      "operator": ">",
+      "value": 30.0
+    },
+    "actions": [
+      {
+        "type": "actuator",
+        "target_id": "fan1",
+        "command": "on"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 🎓 Supported Devices
+
+### Sensors (8+ Types)
+
+| Type | Drivers | Examples |
+|------|---------|----------|
+| Temperature | DHT22, BME280 | Indoor temp |
+| Humidity | DHT22, BME280 | Indoor humidity |
+| Light | BH1750 | Ambient light |
+| Distance | HC-SR04 | Proximity detection |
+| Sound | Analog mic | Sound detection |
+| Gas | MQ135 | Air quality |
+| Motion | PIR | Motion detection |
+| Pressure | BMP280 | Barometric pressure |
+
+### Actuators (6+ Types)
+
+| Type | Drivers | Examples |
+|------|---------|----------|
+| LED | GPIO, PWM | Status indicator |
+| RGB LED | WS2812B | RGB status light |
+| Servo | PWM | Door lock, camera pan |
+| Relay | GPIO | Fan, light switch |
+| Buzzer | PWM | Alarm, notification |
+| Motor | PWM, H-bridge | Wheel, pump |
 
 ---
 
 ## 🎓 Inspired By
 
-This project stands on the shoulders of giants, drawing inspiration from:
+This project stands on shoulders of giants, drawing inspiration from:
 
 ### 🦀 nanochat - Andrej Karpathy
 [github.com/karpathy/nanochat](https://github.com/karpathy/nanochat)
 
 **Single-dial philosophy**: Inspired by nanochat's `--depth` parameter, Q-Lite adopts a simplified `--target` preset system (e.g., `--target esp32`, `--target desktop`). One parameter auto-configures all platform-specific settings.
-
-**End-to-end mindset**: Like nanochat's `speedrun.sh`, Q-Lite provides `quickstart.sh` for instant demos.
 
 ### 🦌 llama2.c - Andrej Karpathy
 [github.com/karpathy/llama2.c](https://github.com/karpathy/llama2.c)
@@ -197,6 +497,11 @@ This project stands on the shoulders of giants, drawing inspiration from:
 
 **Edge AI breakthrough**: Proved that LLMs can run on 1MB RAM. Q-Lite builds on this for gateway deployment.
 
+### 🎮 miniclaw - mattdef
+[github.com/mattdef/miniclaw](https://github.com/mattdef/miniclaw)
+
+**Semantic orchestration**: Inspiration for natural language rule generation and edge agent capabilities.
+
 ---
 
 ## 📚 Documentation
@@ -206,6 +511,7 @@ This project stands on the shoulders of giants, drawing inspiration from:
 - **[platforms/esp32/README.md](platforms/esp32/README.md)** - ESP32 build guide
 - **[platforms/stm32/README.md](platforms/stm32/README.md)** - STM32 build guide
 - **[platforms/pico/README.md](platforms/pico/README.md)** - Raspberry Pi Pico build guide
+- **[RELEASE-NOTES.md](RELEASE-NOTES.md)** - Release notes and changelog
 
 ---
 
@@ -213,7 +519,7 @@ This project stands on the shoulders of giants, drawing inspiration from:
 
 - **Language**: C99 (pure C, no C++ dependencies)
 - **HTTP**: Custom HTTP server
-- **Backend**: Ollama API compatible
+- **Backends**: Ollama, OpenAI, Anthropic
 - **Platforms**: Linux, macOS, Windows, ESP32, STM32, RP2040
 
 ---
@@ -252,11 +558,19 @@ Coming soon. Target metrics:
 - [x] STM32 port (Ethernet, STM32CubeIDE)
 - [x] Raspberry Pi Pico port (WiFi via ESP8266)
 
-### Phase 5: Future Enhancements
-- [ ] TLS/SSL support
-- [ ] WebSocket support
-- [ ] Authentication
-- [ ] Metrics & monitoring
+### Phase 5: Semantic Awareness ✅ Complete (v0.4.0)
+- [x] Cloud API support (OpenAI, Anthropic)
+- [x] Sensor API (8+ sensor types)
+- [x] Actuator API (6+ actuator types)
+- [x] Rule engine (semantic orchestration)
+- [x] Natural language rule generation
+
+### Phase 6: Future Enhancements
+- [ ] WebSocket real-time data stream
+- [ ] MQTT notification support
+- [ ] Time-based scheduling (e.g., "every day at 08:00")
+- [ ] Complex conditions (e.g., "temp > 30°C AND humidity < 50%")
+- [ ] Platform-specific sensor drivers (ESP32, STM32, RP2040)
 
 ---
 
@@ -266,7 +580,8 @@ Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 
 Focus areas:
 - Memory optimization
-- New platform ports
+- New sensor drivers
+- New actuator drivers
 - Bug fixes
 - Documentation improvements
 
@@ -278,13 +593,19 @@ Focus areas:
 A: Target: ESP32-S3 (520KB RAM). Recommended: Raspberry Pi Zero (512MB RAM).
 
 **Q: Can I use this with OpenAI API?**
-A: Yes, Q-Lite supports OpenAI-compatible APIs (vLLM, LM Studio, etc.).
+A: Yes, Q-Lite supports OpenAI, Anthropic (Claude), and OpenAI-compatible APIs.
+
+**Q: How does semantic orchestration work?**
+A: You describe rules in natural language ("When temperature exceeds 30°C, turn on fan"), LLM parses and generates executable JSON rules automatically.
 
 **Q: Is this production-ready?**
-A: Phase 4 MVP. Use with caution.
+A: v0.4.0 is a semantic awareness gateway prototype. Use with caution in production.
 
 **Q: How do I configure WiFi on ESP32?**
 A: See [platforms/esp32/README.md](platforms/esp32/README.md) for detailed instructions.
+
+**Q: Do I need an LLM for semantic orchestration?**
+A: Optional. You can write rules manually in JSON format, or use LLM for automatic rule generation from natural language.
 
 ---
 
@@ -299,9 +620,12 @@ MIT License - See [LICENSE](LICENSE) for details.
 - **GitHub**: [https://github.com/RalphBigBear/q-lite](https://github.com/RalphBigBear/q-lite)
 - **Issues**: [https://github.com/RalphBigBear/q-lite/issues](https://github.com/RalphBigBear/q-lite/issues)
 - **Discussions**: [https://github.com/RalphBigBear/q-lite/discussions](https://github.com/RalphBigBear/q-lite/discussions)
+- **Latest Release**: [https://github.com/RalphBigBear/q-lite/releases/latest](https://github.com/RalphBigBear/q-lite/releases/latest)
 
 ---
 
-**Made with inspiration from Karpathy, Davebben, and Sipeed.**
+**Made with inspiration from Karpathy, Davebben, and mattdef.**
 
 *"Simplicity is the ultimate sophistication."* - Leonardo da Vinci
+
+**"Provide low-level capabilities, users orchestrate via semantics" - Q-Lite v0.4.0** 🌟
